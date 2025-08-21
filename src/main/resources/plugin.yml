@@ -1,0 +1,108 @@
+name: We-Friends
+version: '${project.version}'
+main: me.wethink.weFriends.WeFriends
+api-version: '1.20'
+folia-supported: true
+authors: [ WeThink ]
+
+commands:
+  friend:
+    description: Friend system root command
+    aliases: [ friends, f ]
+    permission: wefriends.friend.base
+    usage: "/friend <add|accept|deny|remove|list|toggle|chat>"
+  fchat:
+    description: Send a message to all online friends
+    permission: wefriends.friend.chat
+    usage: "/fchat <message>"
+  fmsg:
+    description: Send a private message to a friend
+    permission: wefriends.friend.msg
+    usage: "/fmsg <friend> <message>"
+  party:
+    description: Party system root command
+    aliases: [ p ]
+    permission: wefriends.party.base
+    usage: "/party <create|invite|accept|deny|leave|kick|promote|transfer|disband|chat>"
+  pc:
+    description: Party chat shortcut
+    permission: wefriends.party.chat
+    usage: "/pc <message>"
+  fchatmode:
+    description: Toggle friend chat mode
+    permission: wefriends.friend.chat
+    usage: "/fchatmode"
+  pchatmode:
+    description: Toggle party chat mode
+    permission: wefriends.party.chat
+    usage: "/pchatmode"
+  chatmode:
+    description: Reset chat mode to global
+    permission: wefriends.friend.chat
+    usage: "/chatmode"
+  fchatspy:
+    description: Toggle spying on friend chats and messages
+    permission: wefriends.admin.spy.fchat
+  partyspy:
+    description: Toggle spying on party chats
+    permission: wefriends.admin.spy.party
+  wefriends:
+    description: We-Friends admin command
+    permission: wefriends.admin.base
+    usage: "/wefriends <reload|version|debug|spy>"
+
+permissions:
+  wefriends.friend.base:
+    default: true
+  wefriends.friend.add:
+    default: true
+  wefriends.friend.accept:
+    default: true
+  wefriends.friend.deny:
+    default: true
+  wefriends.friend.remove:
+    default: true
+  wefriends.friend.list:
+    default: true
+  wefriends.friend.toggle:
+    default: true
+  wefriends.friend.chat:
+    default: true
+  wefriends.friend.msg:
+    default: true
+
+  wefriends.party.base:
+    default: true
+  wefriends.party.create:
+    default: true
+  wefriends.party.invite:
+    default: true
+  wefriends.party.accept:
+    default: true
+  wefriends.party.deny:
+    default: true
+  wefriends.party.leave:
+    default: true
+  wefriends.party.kick:
+    default: true
+  wefriends.party.disband:
+    default: true
+  wefriends.party.chat:
+    default: true
+
+  wefriends.admin.base:
+    default: op
+  wefriends.admin.reload:
+    default: op
+  wefriends.admin.version:
+    default: true
+  wefriends.admin.debug:
+    default: op
+  wefriends.admin.spy.fchat:
+    default: op
+  wefriends.admin.spy.party:
+    default: op
+  wefriends.admin.spy.all:
+    default: op
+  wefriends.limits.unlimited:
+    default: op

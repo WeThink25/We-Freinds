@@ -1,0 +1,75 @@
+
+database:
+  type: sqlite # sqlite or mysql
+  mysql:
+    host: localhost
+    port: 3306
+    database: wefriends
+    username: root
+    password: ""
+
+redis:
+  enabled: false
+  host: localhost
+  port: 6379
+  password: ""
+  channel: wefriends:events
+
+limits:
+  max-friends: 200
+  max-party-size: 8
+
+messages:
+  usage:
+    friend: "<gray>/friend <add|accept|deny|remove|list|toggle|chat>"
+    friend_add: "<gray>/friend add <player>"
+    friend_accept: "<gray>/friend accept <player>"
+    friend_deny: "<gray>/friend deny <player>"
+    friend_remove: "<gray>/friend remove <player>"
+    fchat: "<gray>/fchat <message>"
+    fmsg: "<gray>/fmsg <friend> <message>"
+    party: "<gray>/party <create|invite|accept|deny|leave|kick|promote|transfer|disband|chat>"
+    party_invite: "<gray>/party invite <player>"
+    party_accept: "<gray>/party accept <player>"
+    party_deny: "<gray>/party deny <player>"
+    party_kick: "<gray>/party kick <player>"
+    party_promote: "<gray>/party promote <player>"
+    party_transfer: "<gray>/party transfer <player>"
+    pc: "<gray>/pc <message>"
+
+  error:
+    self_friend: "<red>You cannot friend yourself."
+    player_not_found: "<red>Player <white>%player%</white> not found."
+
+  friend:
+    requests_off: "<yellow>%friend%</yellow> has friend requests <red>disabled</red>."
+    already: "<yellow>%friend%</yellow> is already your friend."
+    accepted: "<green>You are now friends with <yellow>%friend%</yellow>."
+    accepted_other: "<yellow>%friend%</yellow> accepted your friend request."
+    denied: "<red>You denied the request from <yellow>%friend%</yellow>."
+    removed: "<gray>You removed <yellow>%friend%</yellow> from your friends."
+    not_friends: "<red>You are not friends with <yellow>%friend%</yellow>."
+    list_header: "<gray>Friends: <green>%online%</green>/<yellow>%total%</yellow> online"
+    list_empty: "<gray>You have no friends added."
+
+  actionbar:
+    friend_join: "<gray>Your friend <green>%player%</green> joined."
+    friend_quit: "<gray>Your friend <red>%player%</red> left."
+    friend_request: "<gray>Friend request from <yellow>%player%</yellow>!"
+    party_invite: "<gray>Party invite from <yellow>%player%</yellow>!"
+
+  chat:
+    friend_format: "<yellow>[F] <green>%player%</green><gray>: </gray>%message%"
+    friend_msg_receive: "<yellow>[F->You] <green>%player%</green><gray>: </gray>%message%"
+    friend_msg_send: "<yellow>[You->F] <green>%friend%</green><gray>: </gray>%message%"
+    party_format: "<aqua>[P] <green>%player%</green><gray>: </gray>%message%"
+
+  spy:
+    friend_on: "<gray><i>[Spy]</i> Friend chat spy <green>enabled</green>."
+    friend_off: "<gray><i>[Spy]</i> Friend chat spy <red>disabled</red>."
+    party_on: "<gray><i>[Spy]</i> Party chat spy <green>enabled</green>."
+    party_off: "<gray><i>[Spy]</i> Party chat spy <red>disabled</red>."
+    all_on: "<gray><i>[Spy]</i> All spy modes <green>enabled</green>."
+    all_off: "<gray><i>[Spy]</i> All spy modes <red>disabled</red>."
+
+
