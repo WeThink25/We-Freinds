@@ -33,6 +33,14 @@
             </goals>
           </execution>
         </executions>
+        <configuration>
+          <relocations>
+            <relocation>
+              <pattern>com.tcoded.folialib</pattern>
+              <shadedPattern>me.wethink.weFriends.libs.folialib</shadedPattern>
+            </relocation>
+          </relocations>
+        </configuration>
       </plugin>
     </plugins>
   </build>
@@ -44,6 +52,10 @@
     <repository>
       <id>placeholderapi</id>
       <url>https://repo.extendedclip.com/content/repositories/placeholderapi/</url>
+    </repository>
+    <repository>
+      <id>devmart-other</id>
+      <url>https://nexuslite.gcnt.net/repos/other/</url>
     </repository>
   </repositories>
   <dependencies>

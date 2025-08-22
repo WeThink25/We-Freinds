@@ -1,4 +1,3 @@
-
 usage:
   friend: "<gray>/friend <add|accept|deny|remove|list|requests|toggle|chat>"
   friend_add: "<gray>/friend add <player>"
@@ -20,6 +19,8 @@ error:
   self_friend: "<red>You cannot friend yourself."
   player_not_found: "<red>Player <white>%player%</white> not found."
   no_permission: "<red>You don't have permission to use this command."
+  invalid_syntax: "<red>Invalid syntax. Please use <gray>/help</gray> for more information."
+  invalid_player: "<red>Invalid player. Please use a valid player name."
 
 friend:
   requests_off: "<yellow>%friend%</yellow> has friend requests <red>disabled</red>."
@@ -35,12 +36,21 @@ friend:
   list_offline: "<red>Offline: <white>%friends%</white>"
   request_sent: "<green>Friend request sent to <yellow>%friend%</yellow>."
   request_received: "<yellow>%player%</yellow> sent you a friend request!"
+  toggle_on: "<green>Friend requests <green>enabled</green>."
+  toggle_off: "<red>Friend requests <red>disabled</red>."
+  no_requests: "<gray>You have no pending friend requests."
+  requests_header: "<gray>Pending friend requests (<yellow>%count%</yellow>):"
+  request_item: "<gray>- <yellow>%player%</yellow>"
+  request_sent_other: "<yellow>%player%</yellow> sent a friend request to <yellow>%friend%</yellow>."
+  friend_limit_reached: "<red>You have reached the maximum number of friends."
 
 actionbar:
   friend_join: "<gray>Your friend <green>%player%</green> joined."
   friend_quit: "<gray>Your friend <red>%player%</red> left."
   friend_request: "<gray>Friend request from <yellow>%player%</yellow>!"
   party_invite: "<gray>Party invite from <yellow>%player%</yellow>!"
+  party_member_joined: "<gray><green>%player%</green> joined the party!"
+  party_member_left: "<gray><red>%player%</red> left the party!"
 
 chat:
   friend_format: "<yellow>[F] <green>%player%</green><gray>: </gray>%message%"
@@ -49,30 +59,28 @@ chat:
   party_format: "<aqua>[P] <green>%player%</green><gray>: </gray>%message%"
   mode_switched: "<green>Chat mode switched to <yellow>%mode%</yellow> mode."
   mode_reset: "<green>Chat mode reset to global."
+  message_sent: "<green>Message sent to <yellow>%player%</yellow>."
 
 party:
   created: "<green>Party created! Use <yellow>/party invite <player></yellow> to invite friends."
   already_in: "<red>You are already in a party."
+  not_in_party: "<red>You are not in a party."
   not_leader: "<red>You are not the party leader."
   target_in_party: "<red><yellow>%player%</yellow> is already in a party."
   not_friend: "<red>You can only invite friends to your party. <yellow>%player%</yellow> is not your friend."
+  invite_sent: "<green>Invited <yellow>%player%</yellow> to your party."
+  invite_received: "<yellow>%player%</yellow> invited you to their party! Use <green>/party accept %player%</green> to join."
   invited: "<green>Invited <yellow>%player%</yellow> to your party."
-  no_invite: "<red>You don't have any party invites."
+  no_invite: "<red>You don't have any party invites from <yellow>%player%</yellow>."
   joined: "<green>You joined the party!"
+  member_joined: "<green><yellow>%player%</yellow> joined the party!"
   denied: "<red>You denied the party invite."
   not_in: "<red>You are not in a party."
   left: "<gray>You left the party."
   kicked: "<red>You kicked <yellow>%player%</yellow> from the party."
   promoted: "<green>You promoted <yellow>%player%</yellow> to leader."
   disbanded: "<red>Party disbanded."
-
-friend:
-  toggle_on: "<green>Friend requests <green>enabled</green>."
-  toggle_off: "<red>Friend requests <red>disabled</red>."
-  no_requests: "<gray>You have no pending friend requests."
-  requests_header: "<gray>Pending friend requests (<yellow>%count%</yellow>):"
-  request_item: "<gray>- <yellow>%player%</yellow>"
-  request_sent_other: "<yellow>%player%</yellow> sent a friend request to <yellow>%friend%</yellow>."
+  party_full: "<red>The party is full. Cannot invite more players."
 
 spy:
   friend_on: "<gray><i>[Spy]</i> Friend chat spy <green>enabled</green>."
@@ -81,5 +89,3 @@ spy:
   party_off: "<gray><i>[Spy]</i> Party chat spy <red>disabled</red>."
   all_on: "<gray><i>[Spy]</i> All spy modes <green>enabled</green>."
   all_off: "<gray><i>[Spy]</i> All spy modes <red>disabled</red>."
-
-

@@ -1,5 +1,6 @@
 package me.wethink.weFriends;
 
+import com.tcoded.folialib.FoliaLib;
 import me.wethink.weFriends.commands.*;
 import me.wethink.weFriends.listeners.ChatListener;
 import me.wethink.weFriends.listeners.PlayerConnectionListener;
@@ -15,6 +16,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class WeFriends extends JavaPlugin {
 
     private static WeFriends instance;
+    private static FoliaLib foliaLib;
 
     private DatabaseManager databaseManager;
     private FriendManager friendManager;
@@ -28,9 +30,23 @@ public final class WeFriends extends JavaPlugin {
         return instance;
     }
 
+    public static FoliaLib getFoliaLib() {
+        return foliaLib;
+    }
+
     @Override
     public void onEnable() {
         instance = this;
+
+        try {
+            foliaLib = new FoliaLib(this);
+            getLogger().info("FoliaLib initialized successfully. Server type: " +
+                    (foliaLib.isFolia() ? "Folia" : "Paper/Spigot"));
+        } catch (Exception e) {
+            getLogger().severe("Failed to initialize FoliaLib: " + e.getMessage());
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
 
         saveDefaultConfig();
         ConfigUtil.load(this);
@@ -65,6 +81,7 @@ public final class WeFriends extends JavaPlugin {
         Bukkit.getConsoleSender().sendMessage("§eServer Information:");
         Bukkit.getConsoleSender().sendMessage(" §a• §fSoftware: §b" + Bukkit.getServer().getName());
         Bukkit.getConsoleSender().sendMessage(" §a• §fVersion: §b" + Bukkit.getServer().getVersion());
+        Bukkit.getConsoleSender().sendMessage(" §a• §fFolia Support: §b" + (foliaLib.isFolia() ? "Enabled" : "Paper/Spigot"));
         Bukkit.getConsoleSender().sendMessage("§b==========================================");
         Bukkit.getConsoleSender().sendMessage("§a§lWe-Friends §fhas been §a§lENABLED§f!");
         Bukkit.getConsoleSender().sendMessage("§b==========================================");
@@ -152,7 +169,6 @@ public final class WeFriends extends JavaPlugin {
         log("&cWeFriends disabled");
     }
 
-    // ✅ Utility for colored console logs
     private void log(String msg) {
         getLogger().info(ChatColor.translateAlternateColorCodes('&', msg));
     }

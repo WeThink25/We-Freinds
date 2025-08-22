@@ -23,76 +23,109 @@ public class PartyManager {
     }
 
     public void createParty(Player leader) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            if (getPartyId(leader.getUniqueId()) != null) {
-                MessageUtil.send(leader, "party.already_in");
-                return;
-            }
-            String partyId = UUID.randomUUID().toString();
-            try (Connection c = db.getConnection()) {
-                try (PreparedStatement ps = c.prepareStatement("INSERT INTO parties(party_id,leader_uuid) VALUES(?,?)")) {
-                    ps.setString(1, partyId);
-                    ps.setString(2, leader.getUniqueId().toString());
-                    ps.executeUpdate();
-                }
-                try (PreparedStatement ps = c.prepareStatement("INSERT INTO party_members(party_id,member_uuid,role) VALUES(?,?,?)")) {
-                    ps.setString(1, partyId);
-                    ps.setString(2, leader.getUniqueId().toString());
-                    ps.setString(3, "LEADER");
-                    ps.executeUpdate();
-                }
-            } catch (SQLException e) {
-                plugin.getLogger().warning("createParty error: " + e.getMessage());
-            }
-            MessageUtil.send(leader, "party.created");
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
+            UUID partyId = UUID.randomUUID();
+
+            // Use corrected DatabaseManager methods
+            db.createParty(partyId, leader.getUniqueId());
+            db.addPartyMember(partyId, leader.getUniqueId(), "LEADER");
+
+            WeFriends.getFoliaLib().getImpl().runAtEntity(leader, (entityTask) -> {
+                MessageUtil.send(leader, "party.created");
+            });
         });
     }
 
     public void invite(Player leader, String targetName) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             String partyId = getPartyId(leader.getUniqueId());
-            if (partyId == null || !isLeader(leader.getUniqueId(), partyId)) {
-                MessageUtil.send(leader, "party.not_leader");
+            if (partyId == null) {
+                WeFriends.getFoliaLib().getImpl().runAtEntity(leader, (entityTask) -> {
+                    MessageUtil.send(leader, "party.not_in_party");
+                });
                 return;
             }
-            Player target = Bukkit.getPlayerExact(targetName);
-            if (target == null) {
-                MessageUtil.send(leader, "error.player_not_found", Map.of("player", targetName));
+            if (!isLeader(leader.getUniqueId(), partyId)) {
+                WeFriends.getFoliaLib().getImpl().runAtEntity(leader, (entityTask) -> {
+                    MessageUtil.send(leader, "party.not_leader");
+                });
                 return;
             }
-            if (getPartyId(target.getUniqueId()) != null) {
-                MessageUtil.send(leader, "party.target_in_party", Map.of("player", target.getName()));
+            UUID targetUuid = resolveUuid(targetName);
+            if (targetUuid == null) {
+                WeFriends.getFoliaLib().getImpl().runAtEntity(leader, (entityTask) -> {
+                    MessageUtil.send(leader, "error.player_not_found", Map.of("player", targetName));
+                });
                 return;
             }
-            // Check if target is a friend
-            if (!plugin.getFriendManager().areFriends(leader.getUniqueId(), target.getUniqueId())) {
-                MessageUtil.send(leader, "party.not_friend", Map.of("player", target.getName()));
+            if (getPartyId(targetUuid) != null) {
+                WeFriends.getFoliaLib().getImpl().runAtEntity(leader, (entityTask) -> {
+                    MessageUtil.send(leader, "party.target_in_party", Map.of("player", targetName));
+                });
                 return;
             }
-            MessageUtil.actionbar(target, "actionbar.party_invite", Map.of("player", leader.getName()));
-            target.playSound(target.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
-            pendingInvites.put(target.getUniqueId(), partyId);
-            MessageUtil.send(leader, "party.invited", Map.of("player", target.getName()));
+            if (!plugin.getFriendManager().areFriends(leader.getUniqueId(), targetUuid)) {
+                WeFriends.getFoliaLib().getImpl().runAtEntity(leader, (entityTask) -> {
+                    MessageUtil.send(leader, "party.not_friend", Map.of("player", targetName));
+                });
+                return;
+            }
+
+            // Use DatabaseManager method for proper conflict handling
+            db.addPartyInvite(UUID.fromString(partyId), leader.getUniqueId(), targetUuid, System.currentTimeMillis());
+
+            Player target = Bukkit.getPlayer(targetUuid);
+            if (target != null) {
+                WeFriends.getFoliaLib().getImpl().runAtEntity(target, (entityTask) -> {
+                    MessageUtil.send(target, "party.invite_received", Map.of("player", leader.getName()));
+                    target.playSound(target.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
+                });
+            }
+            WeFriends.getFoliaLib().getImpl().runAtEntity(leader, (entityTask) -> {
+                MessageUtil.send(leader, "party.invite_sent", Map.of("player", targetName));
+            });
         });
     }
 
     public void accept(Player player, String leaderName) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            String partyId = pendingInvites.get(player.getUniqueId());
-            if (partyId == null) {
-                MessageUtil.send(player, "party.no_invite");
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
+            UUID leaderUuid = resolveUuid(leaderName);
+            if (leaderUuid == null) {
+                WeFriends.getFoliaLib().getImpl().runAtEntity(player, (entityTask) -> {
+                    MessageUtil.send(player, "error.player_not_found", Map.of("player", leaderName));
+                });
                 return;
             }
-            try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("INSERT INTO party_members(party_id,member_uuid,role) VALUES(?,?,?)")) {
-                ps.setString(1, partyId);
-                ps.setString(2, player.getUniqueId().toString());
-                ps.setString(3, "MEMBER");
-                ps.executeUpdate();
-            } catch (SQLException e) {
-                plugin.getLogger().warning("accept invite error: " + e.getMessage());
+            String partyId = getPartyId(leaderUuid);
+            if (partyId == null) {
+                WeFriends.getFoliaLib().getImpl().runAtEntity(player, (entityTask) -> {
+                    MessageUtil.send(player, "party.no_invite", Map.of("player", leaderName));
+                });
+                return;
             }
+
+            // Use DatabaseManager methods
+            db.addPartyMember(UUID.fromString(partyId), player.getUniqueId(), "MEMBER");
+            db.removePartyInvite(player.getUniqueId());
+
             pendingInvites.remove(player.getUniqueId());
-            MessageUtil.send(player, "party.joined");
+            WeFriends.getFoliaLib().getImpl().runAtEntity(player, (entityTask) -> {
+                MessageUtil.send(player, "party.joined");
+                player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+            });
+
+            // Notify all party members
+            List<UUID> partyMembers = getPartyMembers(partyId);
+            for (UUID memberUuid : partyMembers) {
+                if (!memberUuid.equals(player.getUniqueId())) {
+                    Player member = Bukkit.getPlayer(memberUuid);
+                    if (member != null) {
+                        WeFriends.getFoliaLib().getImpl().runAtEntity(member, (entityTask) -> {
+                            MessageUtil.send(member, "party.member_joined", Map.of("player", player.getName()));
+                        });
+                    }
+                }
+            }
         });
     }
 
@@ -102,73 +135,74 @@ public class PartyManager {
     }
 
     public void leave(Player player) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             String partyId = getPartyId(player.getUniqueId());
             if (partyId == null) {
-                MessageUtil.send(player, "party.not_in");
+                WeFriends.getFoliaLib().getImpl().runAtEntity(player, (entityTask) -> {
+                    MessageUtil.send(player, "party.not_in_party");
+                });
                 return;
             }
-            try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("DELETE FROM party_members WHERE party_id=? AND member_uuid=?")) {
-                ps.setString(1, partyId);
-                ps.setString(2, player.getUniqueId().toString());
-                ps.executeUpdate();
-            } catch (SQLException e) {
-                plugin.getLogger().warning("leave party error: " + e.getMessage());
-            }
-            MessageUtil.send(player, "party.left");
+
+            // Use DatabaseManager method
+            db.removePartyMember(UUID.fromString(partyId), player.getUniqueId());
+
+            WeFriends.getFoliaLib().getImpl().runAtEntity(player, (entityTask) -> {
+                MessageUtil.send(player, "party.left");
+            });
         });
     }
 
     public void kick(Player leader, String memberName) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             String partyId = getPartyId(leader.getUniqueId());
             if (partyId == null || !isLeader(leader.getUniqueId(), partyId)) {
-                MessageUtil.send(leader, "party.not_leader");
+                WeFriends.getFoliaLib().getImpl().runAtEntity(leader, (entityTask) -> {
+                    MessageUtil.send(leader, "party.not_leader");
+                });
                 return;
             }
             UUID member = resolveUuid(memberName);
             if (member == null) {
-                MessageUtil.send(leader, "error.player_not_found", Map.of("player", memberName));
+                WeFriends.getFoliaLib().getImpl().runAtEntity(leader, (entityTask) -> {
+                    MessageUtil.send(leader, "error.player_not_found", Map.of("player", memberName));
+                });
                 return;
             }
-            try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("DELETE FROM party_members WHERE party_id=? AND member_uuid=?")) {
-                ps.setString(1, partyId);
-                ps.setString(2, member.toString());
-                ps.executeUpdate();
-            } catch (SQLException e) {
-                plugin.getLogger().warning("kick error: " + e.getMessage());
-            }
-            MessageUtil.send(leader, "party.kicked", Map.of("player", memberName));
+
+            // Use DatabaseManager method
+            db.removePartyMember(UUID.fromString(partyId), member);
+
+            WeFriends.getFoliaLib().getImpl().runAtEntity(leader, (entityTask) -> {
+                MessageUtil.send(leader, "party.kicked", Map.of("player", memberName));
+            });
         });
     }
 
     public void promote(Player leader, String memberName) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             String partyId = getPartyId(leader.getUniqueId());
             if (partyId == null || !isLeader(leader.getUniqueId(), partyId)) {
-                MessageUtil.send(leader, "party.not_leader");
+                WeFriends.getFoliaLib().getImpl().runAtEntity(leader, (entityTask) -> {
+                    MessageUtil.send(leader, "party.not_leader");
+                });
                 return;
             }
             UUID member = resolveUuid(memberName);
             if (member == null) {
-                MessageUtil.send(leader, "error.player_not_found", Map.of("player", memberName));
+                WeFriends.getFoliaLib().getImpl().runAtEntity(leader, (entityTask) -> {
+                    MessageUtil.send(leader, "error.player_not_found", Map.of("player", memberName));
+                });
                 return;
             }
-            try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("UPDATE party_members SET role='LEADER' WHERE party_id=? AND member_uuid=?")) {
-                ps.setString(1, partyId);
-                ps.setString(2, member.toString());
-                ps.executeUpdate();
-            } catch (SQLException e) {
-                plugin.getLogger().warning("promote error: " + e.getMessage());
-            }
-            try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("UPDATE parties SET leader_uuid=? WHERE party_id=?")) {
-                ps.setString(1, member.toString());
-                ps.setString(2, partyId);
-                ps.executeUpdate();
-            } catch (SQLException e) {
-                plugin.getLogger().warning("transfer leader error: " + e.getMessage());
-            }
-            MessageUtil.send(leader, "party.promoted", Map.of("player", memberName));
+
+            // Use DatabaseManager methods
+            db.updatePartyMemberRole(UUID.fromString(partyId), member, "LEADER");
+            db.updatePartyLeader(UUID.fromString(partyId), member);
+
+            WeFriends.getFoliaLib().getImpl().runAtEntity(leader, (entityTask) -> {
+                MessageUtil.send(leader, "party.promoted", Map.of("player", memberName));
+            });
         });
     }
 
@@ -177,41 +211,51 @@ public class PartyManager {
     }
 
     public void disband(Player leader) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             String partyId = getPartyId(leader.getUniqueId());
             if (partyId == null || !isLeader(leader.getUniqueId(), partyId)) {
-                MessageUtil.send(leader, "party.not_leader");
+                WeFriends.getFoliaLib().getImpl().runAtEntity(leader, (entityTask) -> {
+                    MessageUtil.send(leader, "party.not_leader");
+                });
                 return;
             }
-            try (Connection c = db.getConnection()) {
-                c.createStatement().executeUpdate("DELETE FROM party_members WHERE party_id='" + partyId + "'");
-                c.createStatement().executeUpdate("DELETE FROM parties WHERE party_id='" + partyId + "'");
-            } catch (SQLException e) {
-                plugin.getLogger().warning("disband error: " + e.getMessage());
+
+            // Use DatabaseManager methods - members first due to foreign key constraints
+            List<UUID> members = getPartyMembers(partyId);
+            for (UUID memberUuid : members) {
+                db.removePartyMember(UUID.fromString(partyId), memberUuid);
             }
-            MessageUtil.send(leader, "party.disbanded");
+            db.deleteParty(UUID.fromString(partyId));
+
+            WeFriends.getFoliaLib().getImpl().runAtEntity(leader, (entityTask) -> {
+                MessageUtil.send(leader, "party.disbanded");
+            });
         });
     }
 
     public void sendPartyChat(Player sender, String message) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             String partyId = getPartyId(sender.getUniqueId());
             if (partyId == null) {
-                MessageUtil.send(sender, "party.not_in");
+                WeFriends.getFoliaLib().getImpl().runAtEntity(sender, (entityTask) -> {
+                    MessageUtil.send(sender, "party.not_in_party");
+                });
                 return;
             }
-            List<UUID> members = getMembers(partyId);
-            for (UUID m : members) {
-                Player p = Bukkit.getPlayer(m);
-                if (p != null)
-                    MessageUtil.send(p, "chat.party_format", Map.of("player", sender.getName(), "message", message));
-            }
-            plugin.getSpyManager().broadcastPartySpy(sender, message);
+            List<UUID> members = getPartyMembers(partyId);
+            WeFriends.getFoliaLib().getImpl().runAtEntity(sender, (entityTask) -> {
+                for (UUID m : members) {
+                    Player p = Bukkit.getPlayer(m);
+                    if (p != null)
+                        MessageUtil.send(p, "chat.party_format", Map.of("player", sender.getName(), "message", message));
+                }
+                plugin.getSpyManager().broadcastPartySpy(sender, message);
+            });
         });
     }
 
     private String getPartyId(UUID memberUuid) {
-        try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("SELECT party_id FROM party_members WHERE member_uuid=?")) {
+        try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("SELECT party_id FROM party_members WHERE player_uuid=?")) {
             ps.setString(1, memberUuid.toString());
             ResultSet rs = ps.executeQuery();
             if (rs.next()) return rs.getString(1);
@@ -222,7 +266,7 @@ public class PartyManager {
     }
 
     private boolean isLeader(UUID uuid, String partyId) {
-        try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("SELECT 1 FROM parties WHERE party_id=? AND leader_uuid=?")) {
+        try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("SELECT 1 FROM parties WHERE id=? AND leader_uuid=?")) {
             ps.setString(1, partyId);
             ps.setString(2, uuid.toString());
             ResultSet rs = ps.executeQuery();
@@ -235,7 +279,7 @@ public class PartyManager {
 
     private List<UUID> getMembers(String partyId) {
         List<UUID> list = new ArrayList<>();
-        try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("SELECT member_uuid FROM party_members WHERE party_id=?")) {
+        try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("SELECT player_uuid FROM party_members WHERE party_id=?")) {
             ps.setString(1, partyId);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) list.add(UUID.fromString(rs.getString(1)));
@@ -255,7 +299,7 @@ public class PartyManager {
     }
 
     public String getPartyIdPublic(UUID memberUuid) {
-        try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("SELECT party_id FROM party_members WHERE member_uuid=?")) {
+        try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("SELECT party_id FROM party_members WHERE player_uuid=?")) {
             ps.setString(1, memberUuid.toString());
             ResultSet rs = ps.executeQuery();
             if (rs.next()) return rs.getString(1);
@@ -266,7 +310,7 @@ public class PartyManager {
     }
 
     public UUID getPartyLeader(String partyId) {
-        try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("SELECT leader_uuid FROM parties WHERE party_id=?")) {
+        try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("SELECT leader_uuid FROM parties WHERE id=?")) {
             ps.setString(1, partyId);
             ResultSet rs = ps.executeQuery();
             if (rs.next()) return UUID.fromString(rs.getString(1));
@@ -278,7 +322,7 @@ public class PartyManager {
 
     public List<UUID> getPartyMembers(String partyId) {
         List<UUID> list = new ArrayList<>();
-        try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("SELECT member_uuid FROM party_members WHERE party_id=?")) {
+        try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("SELECT player_uuid FROM party_members WHERE party_id=?")) {
             ps.setString(1, partyId);
             ResultSet rs = ps.executeQuery();
             while (rs.next()) list.add(UUID.fromString(rs.getString(1)));
@@ -289,7 +333,7 @@ public class PartyManager {
     }
 
     public String getPartyRole(UUID memberUuid, String partyId) {
-        try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("SELECT role FROM party_members WHERE party_id=? AND member_uuid=?")) {
+        try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("SELECT role FROM party_members WHERE party_id=? AND player_uuid=?")) {
             ps.setString(1, partyId);
             ps.setString(2, memberUuid.toString());
             ResultSet rs = ps.executeQuery();
@@ -300,5 +344,3 @@ public class PartyManager {
         return "MEMBER";
     }
 }
-
-

@@ -26,7 +26,7 @@ public class FriendManager {
     }
 
     public void handleJoin(Player player) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             try (Connection c = db.getConnection()) {
                 try (PreparedStatement ps = c.prepareStatement("INSERT INTO players(uuid,name,requests_enabled,last_seen) VALUES(?,?,1,?) ON CONFLICT(uuid) DO UPDATE SET name=excluded.name")) {
                     ps.setString(1, player.getUniqueId().toString());
@@ -55,7 +55,7 @@ public class FriendManager {
     }
 
     public void handleQuit(Player player) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("UPDATE players SET last_seen=? WHERE uuid=?")) {
                 ps.setLong(1, System.currentTimeMillis());
                 ps.setString(2, player.getUniqueId().toString());
@@ -68,12 +68,14 @@ public class FriendManager {
     }
 
     private void broadcastToFriends(UUID playerUuid, String messageKey, String playerName) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             Set<UUID> friendUuids = getFriendUuids(playerUuid);
             for (UUID friendUuid : friendUuids) {
                 Player friend = Bukkit.getPlayer(friendUuid);
                 if (friend != null && friend.isOnline()) {
-                    MessageUtil.actionbar(friend, messageKey, Map.of("player", playerName));
+                    WeFriends.getFoliaLib().getImpl().runAtEntity(friend, (entityTask) -> {
+                        MessageUtil.actionbar(friend, messageKey, Map.of("player", playerName));
+                    });
                 }
             }
         });
@@ -82,16 +84,24 @@ public class FriendManager {
     public void sendRequest(UUID senderUuid, String senderName, OfflinePlayer target) {
         if (target == null || target.getUniqueId() == null) return;
         UUID targetUuid = target.getUniqueId();
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             try (Connection c = db.getConnection()) {
                 if (!isRequestsEnabled(targetUuid, c)) {
                     Player p = Bukkit.getPlayer(senderUuid);
-                    if (p != null) MessageUtil.send(p, "friend.requests_off", Map.of("friend", target.getName()));
+                    if (p != null) {
+                        WeFriends.getFoliaLib().getImpl().runAtEntity(p, (entityTask) -> {
+                            MessageUtil.send(p, "friend.requests_off", Map.of("friend", target.getName()));
+                        });
+                    }
                     return;
                 }
                 if (areFriends(senderUuid, targetUuid, c)) {
                     Player p = Bukkit.getPlayer(senderUuid);
-                    if (p != null) MessageUtil.send(p, "friend.already", Map.of("friend", target.getName()));
+                    if (p != null) {
+                        WeFriends.getFoliaLib().getImpl().runAtEntity(p, (entityTask) -> {
+                            MessageUtil.send(p, "friend.already", Map.of("friend", target.getName()));
+                        });
+                    }
                     return;
                 }
                 try (PreparedStatement ins = c.prepareStatement("INSERT INTO friend_requests(sender_uuid,target_uuid,created_at) VALUES(?,?,?)")) {
@@ -103,21 +113,26 @@ public class FriendManager {
             } catch (SQLException e) {
                 plugin.getLogger().warning("Failed to send request: " + e.getMessage());
             }
+
+            Player targetOnline = target.isOnline() ? target.getPlayer() : null;
+            if (targetOnline != null) {
+                WeFriends.getFoliaLib().getImpl().runAtEntity(targetOnline, (entityTask) -> {
+                    MessageUtil.actionbar(targetOnline, "actionbar.friend_request", Map.of("player", senderName));
+                    MessageUtil.send(targetOnline, "friend.request_received", Map.of("player", senderName));
+                    targetOnline.playSound(targetOnline.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
+                });
+            }
+            Player sender = Bukkit.getPlayer(senderUuid);
+            if (sender != null) {
+                WeFriends.getFoliaLib().getImpl().runAtEntity(sender, (entityTask) -> {
+                    MessageUtil.send(sender, "friend.request_sent", Map.of("friend", target.getName()));
+                });
+            }
         });
-        Player targetOnline = target.isOnline() ? target.getPlayer() : null;
-        if (targetOnline != null) {
-            MessageUtil.actionbar(targetOnline, "actionbar.friend_request", Map.of("player", senderName));
-            MessageUtil.send(targetOnline, "friend.request_received", Map.of("player", senderName));
-            targetOnline.playSound(targetOnline.getLocation(), org.bukkit.Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0f, 1.0f);
-        }
-        Player sender = Bukkit.getPlayer(senderUuid);
-        if (sender != null) {
-            MessageUtil.send(sender, "friend.request_sent", Map.of("friend", target.getName()));
-        }
     }
 
     public void acceptRequest(UUID acceptorUuid, String fromName) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             try (Connection c = db.getConnection()) {
                 UUID senderUuid = resolveUuidByName(fromName, c);
                 if (senderUuid == null) return;
@@ -128,15 +143,20 @@ public class FriendManager {
                     if (removed == 0) return;
                 }
                 linkFriends(senderUuid, acceptorUuid, c);
+
                 Player a = Bukkit.getPlayer(acceptorUuid);
                 if (a != null) {
-                    MessageUtil.send(a, "friend.accepted", Map.of("friend", fromName));
-                    a.playSound(a.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+                    WeFriends.getFoliaLib().getImpl().runAtEntity(a, (entityTask) -> {
+                        MessageUtil.send(a, "friend.accepted", Map.of("friend", fromName));
+                        a.playSound(a.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+                    });
                 }
                 Player s = Bukkit.getPlayer(senderUuid);
                 if (s != null) {
-                    MessageUtil.send(s, "friend.accepted_other", Map.of("friend", a != null ? a.getName() : ""));
-                    s.playSound(s.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+                    WeFriends.getFoliaLib().getImpl().runAtEntity(s, (entityTask) -> {
+                        MessageUtil.send(s, "friend.accepted_other", Map.of("friend", a != null ? a.getName() : ""));
+                        s.playSound(s.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+                    });
                 }
             } catch (SQLException e) {
                 plugin.getLogger().warning("acceptRequest error: " + e.getMessage());
@@ -145,7 +165,7 @@ public class FriendManager {
     }
 
     public void denyRequest(UUID denierUuid, String fromName) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             try (Connection c = db.getConnection()) {
                 UUID senderUuid = resolveUuidByName(fromName, c);
                 if (senderUuid == null) return;
@@ -155,7 +175,11 @@ public class FriendManager {
                     del.executeUpdate();
                 }
                 Player d = Bukkit.getPlayer(denierUuid);
-                if (d != null) MessageUtil.send(d, "friend.denied", Map.of("friend", fromName));
+                if (d != null) {
+                    WeFriends.getFoliaLib().getImpl().runAtEntity(d, (entityTask) -> {
+                        MessageUtil.send(d, "friend.denied", Map.of("friend", fromName));
+                    });
+                }
             } catch (SQLException e) {
                 plugin.getLogger().warning("denyRequest error: " + e.getMessage());
             }
@@ -163,7 +187,7 @@ public class FriendManager {
     }
 
     public void removeFriend(UUID playerUuid, String friendName) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             try (Connection c = db.getConnection()) {
                 UUID friendUuid = resolveUuidByName(friendName, c);
                 if (friendUuid == null) return;
@@ -175,7 +199,11 @@ public class FriendManager {
                     del.executeUpdate();
                 }
                 Player p = Bukkit.getPlayer(playerUuid);
-                if (p != null) MessageUtil.send(p, "friend.removed", Map.of("friend", friendName));
+                if (p != null) {
+                    WeFriends.getFoliaLib().getImpl().runAtEntity(p, (entityTask) -> {
+                        MessageUtil.send(p, "friend.removed", Map.of("friend", friendName));
+                    });
+                }
             } catch (SQLException e) {
                 plugin.getLogger().warning("removeFriend error: " + e.getMessage());
             }
@@ -183,12 +211,12 @@ public class FriendManager {
     }
 
     public void sendFriendList(Player player) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             Set<UUID> friends = getFriendUuids(player.getUniqueId());
             int online = 0;
             List<String> onlineFriends = new ArrayList<>();
             List<String> offlineFriends = new ArrayList<>();
-            
+
             for (UUID f : friends) {
                 OfflinePlayer op = Bukkit.getOfflinePlayer(f);
                 boolean isOnline = op.isOnline();
@@ -199,34 +227,38 @@ public class FriendManager {
                     offlineFriends.add(op.getName());
                 }
             }
-            
-            Player p = player;
-            MessageUtil.send(p, "friend.list_header", Map.of("online", String.valueOf(online), "total", String.valueOf(friends.size())));
-            
-            if (friends.isEmpty()) {
-                MessageUtil.send(p, "friend.list_empty");
-            } else {
-                if (!onlineFriends.isEmpty()) {
-                    MessageUtil.send(p, "friend.list_online", Map.of("friends", String.join(", ", onlineFriends)));
+
+            final int finalOnline = online;
+            WeFriends.getFoliaLib().getImpl().runAtEntity(player, (entityTask) -> {
+                MessageUtil.send(player, "friend.list_header", Map.of("online", String.valueOf(finalOnline), "total", String.valueOf(friends.size())));
+
+                if (friends.isEmpty()) {
+                    MessageUtil.send(player, "friend.list_empty");
+                } else {
+                    if (!onlineFriends.isEmpty()) {
+                        MessageUtil.send(player, "friend.list_online", Map.of("friends", String.join(", ", onlineFriends)));
+                    }
+                    if (!offlineFriends.isEmpty()) {
+                        MessageUtil.send(player, "friend.list_offline", Map.of("friends", String.join(", ", offlineFriends)));
+                    }
                 }
-                if (!offlineFriends.isEmpty()) {
-                    MessageUtil.send(p, "friend.list_offline", Map.of("friends", String.join(", ", offlineFriends)));
-                }
-            }
+            });
         });
     }
 
     public void sendPendingRequests(Player player) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             List<String> requests = getPendingRequestNames(player.getUniqueId());
-            if (requests.isEmpty()) {
-                MessageUtil.send(player, "friend.no_requests");
-            } else {
-                MessageUtil.send(player, "friend.requests_header", Map.of("count", String.valueOf(requests.size())));
-                for (String name : requests) {
-                    MessageUtil.send(player, "friend.request_item", Map.of("player", name));
+            WeFriends.getFoliaLib().getImpl().runAtEntity(player, (entityTask) -> {
+                if (requests.isEmpty()) {
+                    MessageUtil.send(player, "friend.no_requests");
+                } else {
+                    MessageUtil.send(player, "friend.requests_header", Map.of("count", String.valueOf(requests.size())));
+                    for (String name : requests) {
+                        MessageUtil.send(player, "friend.request_item", Map.of("player", name));
+                    }
                 }
-            }
+            });
         });
     }
 
@@ -234,7 +266,7 @@ public class FriendManager {
         boolean current = requestsEnabled.getOrDefault(playerUuid, true);
         boolean next = !current;
         requestsEnabled.put(playerUuid, next);
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("UPDATE players SET requests_enabled=? WHERE uuid=?")) {
                 ps.setBoolean(1, next);
                 ps.setString(2, playerUuid.toString());
@@ -243,40 +275,55 @@ public class FriendManager {
                 plugin.getLogger().warning("toggleRequests error: " + e.getMessage());
             }
         });
-        MessageUtil.send(player, next ? "friend.toggle_on" : "friend.toggle_off");
+        WeFriends.getFoliaLib().getImpl().runAtEntity(player, (entityTask) -> {
+            MessageUtil.send(player, next ? "friend.toggle_on" : "friend.toggle_off");
+        });
     }
 
     public void sendFriendChat(Player sender, String message) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             Set<UUID> friends = getFriendUuids(sender.getUniqueId());
             for (UUID f : friends) {
                 Player fp = Bukkit.getPlayer(f);
-                if (fp != null)
-                    MessageUtil.send(fp, "chat.friend_format", Map.of("player", sender.getName(), "message", message));
+                if (fp != null) {
+                    WeFriends.getFoliaLib().getImpl().runAtEntity(fp, (entityTask) -> {
+                        MessageUtil.send(fp, "chat.friend_format", Map.of("player", sender.getName(), "message", message));
+                    });
+                }
             }
-            // Send message to sender as well
-            MessageUtil.send(sender, "chat.friend_format", Map.of("player", sender.getName(), "message", message));
-            plugin.getSpyManager().broadcastFriendSpy(sender, message);
+            WeFriends.getFoliaLib().getImpl().runAtEntity(sender, (entityTask) -> {
+                MessageUtil.send(sender, "chat.friend_format", Map.of("player", sender.getName(), "message", message));
+                plugin.getSpyManager().broadcastFriendSpy(sender, message);
+            });
         });
     }
 
     public void sendPrivateMessage(Player sender, String targetName, String message) {
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             try (Connection c = db.getConnection()) {
                 UUID targetUuid = resolveUuidByName(targetName, c);
                 if (targetUuid == null) {
-                    MessageUtil.send(sender, "error.player_not_found", Map.of("player", targetName));
+                    WeFriends.getFoliaLib().getImpl().runAtEntity(sender, (entityTask) -> {
+                        MessageUtil.send(sender, "error.player_not_found", Map.of("player", targetName));
+                    });
                     return;
                 }
                 if (!areFriends(sender.getUniqueId(), targetUuid, c)) {
-                    MessageUtil.send(sender, "friend.not_friends", Map.of("friend", targetName));
+                    WeFriends.getFoliaLib().getImpl().runAtEntity(sender, (entityTask) -> {
+                        MessageUtil.send(sender, "friend.not_friends", Map.of("friend", targetName));
+                    });
                     return;
                 }
                 Player target = Bukkit.getPlayer(targetUuid);
-                if (target != null)
-                    MessageUtil.send(target, "chat.friend_msg_receive", Map.of("player", sender.getName(), "message", message));
-                MessageUtil.send(sender, "chat.friend_msg_send", Map.of("friend", targetName, "message", message));
-                plugin.getSpyManager().broadcastFriendSpy(sender, "(to " + targetName + ") " + message);
+                if (target != null) {
+                    WeFriends.getFoliaLib().getImpl().runAtEntity(target, (entityTask) -> {
+                        MessageUtil.send(target, "chat.friend_msg_receive", Map.of("player", sender.getName(), "message", message));
+                    });
+                }
+                WeFriends.getFoliaLib().getImpl().runAtEntity(sender, (entityTask) -> {
+                    MessageUtil.send(sender, "chat.friend_msg_send", Map.of("friend", targetName, "message", message));
+                    plugin.getSpyManager().broadcastFriendSpy(sender, "(to " + targetName + ") " + message);
+                });
             } catch (SQLException e) {
                 plugin.getLogger().warning("sendPrivateMessage error: " + e.getMessage());
             }
@@ -347,9 +394,6 @@ public class FriendManager {
         return out;
     }
 
-    public void shutdown() {
-    }
-
     public Set<UUID> getFriendUuidsPublic(UUID uuid) {
         Set<UUID> out = new HashSet<>();
         try (Connection c = db.getConnection(); PreparedStatement ps = c.prepareStatement("SELECT friend_uuid FROM friends WHERE user_uuid=?")) {
@@ -393,6 +437,7 @@ public class FriendManager {
         }
         return names;
     }
+
+    public void shutdown() {
+    }
 }
-
-

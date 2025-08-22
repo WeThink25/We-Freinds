@@ -6,6 +6,7 @@ import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.JedisPubSub;
 
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 public class RedisManager {
@@ -116,6 +117,87 @@ public class RedisManager {
                 jedis.publish(channel, message);
             } catch (Exception e) {
                 plugin.getLogger().warning("Redis publish error: " + e.getMessage());
+            }
+        });
+    }
+
+    // Save/sync methods for cross-server data persistence
+    public void saveFriendData(UUID playerUuid, String data) {
+        if (!enabled || pool == null) return;
+
+        CompletableFuture.runAsync(() -> {
+            try (Jedis jedis = pool.getResource()) {
+                String key = "wefriends:friends:" + playerUuid.toString();
+                jedis.setex(key, 3600, data); // Expire after 1 hour
+            } catch (Exception e) {
+                plugin.getLogger().warning("Redis saveFriendData error: " + e.getMessage());
+            }
+        });
+    }
+
+    public void savePartyData(String partyId, String data) {
+        if (!enabled || pool == null) return;
+
+        CompletableFuture.runAsync(() -> {
+            try (Jedis jedis = pool.getResource()) {
+                String key = "wefriends:party:" + partyId;
+                jedis.setex(key, 3600, data); // Expire after 1 hour
+            } catch (Exception e) {
+                plugin.getLogger().warning("Redis savePartyData error: " + e.getMessage());
+            }
+        });
+    }
+
+    public CompletableFuture<String> getFriendData(UUID playerUuid) {
+        if (!enabled || pool == null) return CompletableFuture.completedFuture(null);
+
+        return CompletableFuture.supplyAsync(() -> {
+            try (Jedis jedis = pool.getResource()) {
+                String key = "wefriends:friends:" + playerUuid.toString();
+                return jedis.get(key);
+            } catch (Exception e) {
+                plugin.getLogger().warning("Redis getFriendData error: " + e.getMessage());
+                return null;
+            }
+        });
+    }
+
+    public CompletableFuture<String> getPartyData(String partyId) {
+        if (!enabled || pool == null) return CompletableFuture.completedFuture(null);
+
+        return CompletableFuture.supplyAsync(() -> {
+            try (Jedis jedis = pool.getResource()) {
+                String key = "wefriends:party:" + partyId;
+                return jedis.get(key);
+            } catch (Exception e) {
+                plugin.getLogger().warning("Redis getPartyData error: " + e.getMessage());
+                return null;
+            }
+        });
+    }
+
+    public void removePlayerData(UUID playerUuid) {
+        if (!enabled || pool == null) return;
+
+        CompletableFuture.runAsync(() -> {
+            try (Jedis jedis = pool.getResource()) {
+                String friendKey = "wefriends:friends:" + playerUuid.toString();
+                jedis.del(friendKey);
+            } catch (Exception e) {
+                plugin.getLogger().warning("Redis removePlayerData error: " + e.getMessage());
+            }
+        });
+    }
+
+    public void removePartyData(String partyId) {
+        if (!enabled || pool == null) return;
+
+        CompletableFuture.runAsync(() -> {
+            try (Jedis jedis = pool.getResource()) {
+                String partyKey = "wefriends:party:" + partyId;
+                jedis.del(partyKey);
+            } catch (Exception e) {
+                plugin.getLogger().warning("Redis removePartyData error: " + e.getMessage());
             }
         });
     }
