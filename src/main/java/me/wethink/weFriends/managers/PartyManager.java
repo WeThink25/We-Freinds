@@ -26,7 +26,6 @@ public class PartyManager {
         WeFriends.getFoliaLib().getImpl().runAsync((task) -> {
             UUID partyId = UUID.randomUUID();
 
-            // Use corrected DatabaseManager methods
             db.createParty(partyId, leader.getUniqueId());
             db.addPartyMember(partyId, leader.getUniqueId(), "LEADER");
 
@@ -71,7 +70,6 @@ public class PartyManager {
                 return;
             }
 
-            // Use DatabaseManager method for proper conflict handling
             db.addPartyInvite(UUID.fromString(partyId), leader.getUniqueId(), targetUuid, System.currentTimeMillis());
 
             Player target = Bukkit.getPlayer(targetUuid);
@@ -84,6 +82,10 @@ public class PartyManager {
             WeFriends.getFoliaLib().getImpl().runAtEntity(leader, (entityTask) -> {
                 MessageUtil.send(leader, "party.invite_sent", Map.of("player", targetName));
             });
+            
+            if (plugin.getRedisManager().isEnabled() && plugin.getRedisManager().isCrossServerEnabled()) {
+                plugin.getRedisManager().publishPartyInvite(leader.getUniqueId(), leader.getName(), targetName);
+            }
         });
     }
 
@@ -104,7 +106,6 @@ public class PartyManager {
                 return;
             }
 
-            // Use DatabaseManager methods
             db.addPartyMember(UUID.fromString(partyId), player.getUniqueId(), "MEMBER");
             db.removePartyInvite(player.getUniqueId());
 
@@ -114,7 +115,6 @@ public class PartyManager {
                 player.playSound(player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
             });
 
-            // Notify all party members
             List<UUID> partyMembers = getPartyMembers(partyId);
             for (UUID memberUuid : partyMembers) {
                 if (!memberUuid.equals(player.getUniqueId())) {
@@ -125,6 +125,10 @@ public class PartyManager {
                         });
                     }
                 }
+            }
+            
+            if (plugin.getRedisManager().isEnabled() && plugin.getRedisManager().isCrossServerEnabled()) {
+                plugin.getRedisManager().publishPartyJoin(player.getUniqueId(), player.getName(), partyId);
             }
         });
     }
@@ -144,12 +148,15 @@ public class PartyManager {
                 return;
             }
 
-            // Use DatabaseManager method
             db.removePartyMember(UUID.fromString(partyId), player.getUniqueId());
 
             WeFriends.getFoliaLib().getImpl().runAtEntity(player, (entityTask) -> {
                 MessageUtil.send(player, "party.left");
             });
+            
+            if (plugin.getRedisManager().isEnabled() && plugin.getRedisManager().isCrossServerEnabled()) {
+                plugin.getRedisManager().publishPartyLeave(player.getUniqueId(), player.getName(), partyId);
+            }
         });
     }
 
@@ -170,12 +177,15 @@ public class PartyManager {
                 return;
             }
 
-            // Use DatabaseManager method
             db.removePartyMember(UUID.fromString(partyId), member);
 
             WeFriends.getFoliaLib().getImpl().runAtEntity(leader, (entityTask) -> {
                 MessageUtil.send(leader, "party.kicked", Map.of("player", memberName));
             });
+            
+            if (plugin.getRedisManager().isEnabled() && plugin.getRedisManager().isCrossServerEnabled()) {
+                plugin.getRedisManager().publishPartyLeave(member, memberName, partyId);
+            }
         });
     }
 
@@ -196,7 +206,6 @@ public class PartyManager {
                 return;
             }
 
-            // Use DatabaseManager methods
             db.updatePartyMemberRole(UUID.fromString(partyId), member, "LEADER");
             db.updatePartyLeader(UUID.fromString(partyId), member);
 
@@ -220,7 +229,6 @@ public class PartyManager {
                 return;
             }
 
-            // Use DatabaseManager methods - members first due to foreign key constraints
             List<UUID> members = getPartyMembers(partyId);
             for (UUID memberUuid : members) {
                 db.removePartyMember(UUID.fromString(partyId), memberUuid);
@@ -251,6 +259,10 @@ public class PartyManager {
                 }
                 plugin.getSpyManager().broadcastPartySpy(sender, message);
             });
+            
+            if (plugin.getRedisManager().isEnabled() && plugin.getRedisManager().isCrossServerEnabled()) {
+                plugin.getRedisManager().publishPartyChat(sender.getUniqueId(), sender.getName(), partyId, message);
+            }
         });
     }
 

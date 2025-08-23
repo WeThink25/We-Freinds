@@ -52,6 +52,9 @@ public class FriendManager {
             }
         });
         broadcastToFriends(player.getUniqueId(), "actionbar.friend_join", player.getName());
+        if (plugin.getRedisManager().isEnabled() && plugin.getRedisManager().isCrossServerEnabled()) {
+            plugin.getRedisManager().publishFriendJoin(player.getUniqueId(), player.getName());
+        }
     }
 
     public void handleQuit(Player player) {
@@ -65,6 +68,9 @@ public class FriendManager {
             }
         });
         broadcastToFriends(player.getUniqueId(), "actionbar.friend_quit", player.getName());
+        if (plugin.getRedisManager().isEnabled() && plugin.getRedisManager().isCrossServerEnabled()) {
+            plugin.getRedisManager().publishFriendQuit(player.getUniqueId(), player.getName());
+        }
     }
 
     private void broadcastToFriends(UUID playerUuid, String messageKey, String playerName) {
@@ -296,6 +302,9 @@ public class FriendManager {
                 plugin.getSpyManager().broadcastFriendSpy(sender, message);
             });
         });
+        if (plugin.getRedisManager().isEnabled() && plugin.getRedisManager().isCrossServerEnabled()) {
+            plugin.getRedisManager().publishFriendChat(sender.getUniqueId(), sender.getName(), message);
+        }
     }
 
     public void sendPrivateMessage(Player sender, String targetName, String message) {
@@ -324,6 +333,9 @@ public class FriendManager {
                     MessageUtil.send(sender, "chat.friend_msg_send", Map.of("friend", targetName, "message", message));
                     plugin.getSpyManager().broadcastFriendSpy(sender, "(to " + targetName + ") " + message);
                 });
+                if (plugin.getRedisManager().isEnabled() && plugin.getRedisManager().isCrossServerEnabled()) {
+                    plugin.getRedisManager().publishFriendMessage(sender.getUniqueId(), sender.getName(), targetName, message);
+                }
             } catch (SQLException e) {
                 plugin.getLogger().warning("sendPrivateMessage error: " + e.getMessage());
             }

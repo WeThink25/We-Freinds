@@ -14,6 +14,14 @@ redis:
   password: ""
   channel: wefriends:events
 
+server:
+  name: lobby
+
+cross-server:
+  enabled: true
+  sync-interval: 30
+  notification-timeout: 5
+
 limits:
   max-friends: 200
   max-party-size: 8
@@ -50,6 +58,39 @@ messages:
     not_friends: "<red>You are not friends with <yellow>%friend%</yellow>."
     list_header: "<gray>Friends: <green>%online%</green>/<yellow>%total%</yellow> online"
     list_empty: "<gray>You have no friends added."
+    list_online: "<green>Online:</green> <white>%friends%</white>"
+    list_offline: "<gray>Offline:</gray> <white>%friends%</white>"
+    no_requests: "<gray>You have no pending friend requests."
+    requests_header: "<gray>Pending requests (<yellow>%count%</yellow>):"
+    request_item: "<gray>- <yellow>%player%</yellow> <click:run_command:/friend accept %player%><green>[Accept]</green></click> <click:run_command:/friend deny %player%><red>[Deny]</red></click>"
+    request_received: "<yellow>%player%</yellow> sent you a friend request!"
+    request_sent: "<gray>Friend request sent to <yellow>%friend%</yellow>."
+    toggle_on: "<green>Friend requests enabled."
+    toggle_off: "<red>Friend requests disabled."
+
+  party:
+    created: "<green>Party created! Invite friends with <yellow>/party invite <player></yellow>."
+    not_in_party: "<red>You are not in a party."
+    not_leader: "<red>You must be the party leader to do this."
+    target_in_party: "<red><yellow>%player%</yellow> is already in a party."
+    not_friend: "<red>You can only invite friends to your party."
+    invite_received: "<yellow>%player%</yellow> invited you to their party! <click:run_command:/party accept %player%><green>[Accept]</green></click> <click:run_command:/party deny %player%><red>[Deny]</red></click>"
+    invite_sent: "<gray>Party invite sent to <yellow>%player%</yellow>."
+    no_invite: "<red>No party invite from <yellow>%player%</yellow>."
+    joined: "<green>You joined the party!"
+    member_joined: "<green><yellow>%player%</yellow> joined the party!"
+    member_left: "<yellow><yellow>%player%</yellow> left the party."
+    denied: "<gray>Party invite denied."
+    left: "<gray>You left the party."
+    kicked: "<gray>You kicked <yellow>%player%</yellow> from the party."
+    promoted: "<gray>You promoted <yellow>%player%</yellow> to party leader."
+    disbanded: "<red>Party disbanded."
+    cross_server_invite: "<yellow>%player%</yellow> invited you to their party from <yellow>%server%</yellow>! <click:run_command:/party accept %player% %server%><green>[Accept]</green></click> <click:run_command:/party deny %player% %server%><red>[Deny]</red></click>"
+    cross_server_joined: "<green>You joined the party from <yellow>%server%</yellow>!"
+    cross_server_member_joined: "<green><yellow>%player%</yellow> joined the party from <yellow>%server%</yellow>!"
+    cross_server_member_left: "<yellow><yellow>%player%</yellow> left the party from <yellow>%server%</yellow>."
+    cross_server_kicked: "<gray>You kicked <yellow>%player%</yellow> from the party from <yellow>%server%</yellow>."
+    cross_server_promoted: "<gray>You promoted <yellow>%player%</yellow> to party leader from <yellow>%server%</yellow>."
 
   actionbar:
     friend_join: "<gray>Your friend <green>%player%</green> joined."
@@ -70,5 +111,3 @@ messages:
     party_off: "<gray><i>[Spy]</i> Party chat spy <red>disabled</red>."
     all_on: "<gray><i>[Spy]</i> All spy modes <green>enabled</green>."
     all_off: "<gray><i>[Spy]</i> All spy modes <red>disabled</red>."
-
-
