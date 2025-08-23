@@ -307,8 +307,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Issues**: [GitHub Issues](https://github.com/WeThink25/We-Friends/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/WeThink25/We-Friends/discussions)
-- **Discord**: [WeThink Community](https://discord.gg/wethink)
 
 ---
 
 Made with ❤️ by [WeThink](https://github.com/WeThink25)
+
